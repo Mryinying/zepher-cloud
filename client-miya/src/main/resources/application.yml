@@ -1,0 +1,20 @@
+server:
+  port: 8762
+
+spring:
+  zipkin:
+    base-url: http://localhost:9411
+  application:
+    name: service-hi
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: http://peer1:8761/eureka/
+
+# 暴露监控端点
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"

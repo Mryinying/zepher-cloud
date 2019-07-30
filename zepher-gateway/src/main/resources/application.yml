@@ -1,0 +1,101 @@
+server:
+  port: 8081
+
+spring:
+  profiles:
+    active: dev
+  application:
+    name: gateway-service
+  redis:
+    database: 0
+    host: 127.0.0.1
+    port: 6379
+    password: wancai123
+    jedis:
+      pool:
+        max-active: 200
+        max-idle: 10
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enabled: true
+          # 服务名小写
+          lower-case-service-id: true
+      routes:
+        - id: service-hi
+          # lb代表从注册中心获取服务，且已负载均衡方式转发
+          uri: lb://service-hi
+          predicates:
+            - Path=/consumer/**
+          # 加上StripPrefix=1，否则转发到后端服务时会带上consumer前缀
+          filters:
+            - StripPrefix=1
+            # token filter
+            #- TokenAuthenticationFilter
+            - name: Hystrix
+              args:
+                name: fallbackcmd
+                fallbackUri: forward:/defaultfallback
+            # redis限流 ， filter名称必须是RequestRateLimiter
+#            - name: RequestRateLimiter
+#              args:
+#                # 使用SpEL名称引用Bean，与RateLimiterConfig类中的bean的name相同
+#                key-resolver: '#{@remoteAddrKeyResolver}'
+#                # 每秒最大访问次数
+#                redis-rate-limiter.replenishRate: 2
+#                # 令牌桶最大容量
+#                redis-rate-limiter.burstCapacity: 5
+        - id: service-lucky
+          # lb代表从注册中心获取服务，且已负载均衡方式转发
+          uri: lb://service-lucky
+          predicates:
+            - Path=/lucky/**
+          # 加上StripPrefix=1，否则转发到后端服务时会带上consumer前缀 ，StripPrefix过滤器是去掉一个路径consumer
+          filters:
+            - StripPrefix=1
+# 注册中心
+eureka:
+  instance:
+    prefer-ip-address: true
+  client:
+    serviceUrl:
+      defaultZone: http://localhost:8761/eureka/
+
+# 暴露监控端点
+management:
+  endpoints:
+    web:
+      exposure:
+        include: '*'
+  endpoint:
+    health:
+      show-details: always
+
+#ribbon:
+#  ConnectTimeout: 3000
+#  ReadTimeout: 10000
+
+# hystrix 信号量隔离，3秒后自动超时
+
+service-hi:
+  ribbon:
+    ConnectTimeout: 5000
+    ReadTimeout: 5000
+
+service-lucky:
+  ribbon:
+    ConnectTimeout: 500
+    ReadTimeout: 500
+
+#hystrix.command.fallbackcmd.execution.isolation.thread.timeoutInMilliseconds: 5000
+
+hystrix:
+  command:
+    fallbackcmd:
+      execution:
+        isolation:
+          thread:
+            timeoutInMilliseconds: 3000
+          strategy: SEMAPHORE
+  shareSecurityContext: true
